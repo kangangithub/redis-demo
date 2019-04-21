@@ -6,11 +6,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.params.SetParams;
 
 import javax.annotation.Resource;
 import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Jedis的CRUD操作
