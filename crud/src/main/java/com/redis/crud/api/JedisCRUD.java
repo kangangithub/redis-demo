@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.SortingParams;
 
 import javax.annotation.Resource;
 import java.util.HashMap;
@@ -33,14 +34,12 @@ public class JedisCRUD {
         set(jedis);
         // Hash操作
         hash(jedis);
-
-
-        // 删除多个key
-        jedis.del("test", "test1");
-
-        // 分布式锁, 但setnx和expire不是原子操作, 要用lua脚本解决
-        jedis.setnx("test", "100");
-        jedis.expire("test", 60);
+        // ZSet操作
+        zSet(jedis);
+        // sort操作
+        sort(jedis);
+        // 分布式锁
+        distributedLock(jedis, "lockKey", "requestId", "60");
     }
 
     /**
@@ -61,6 +60,8 @@ public class JedisCRUD {
         jedis.incrBy("test", 2L);
         // value - 2
         jedis.decrBy("test", 2L);
+        // 删除多个key
+        jedis.del("test", "test1");
     }
 
     /**
@@ -147,5 +148,99 @@ public class JedisCRUD {
         jedis.hexists("hash", "k1");
         // hash中取k1,k2
         jedis.hmget("hash", "k1", "k2");
+    }
+
+    /**
+     * ZSet操作
+     *
+     * @param jedis jedis
+     */
+    private void zSet(Jedis jedis) {
+        // 添加
+        jedis.zadd("zset", 0.1D, "1");
+        jedis.zadd("zset", new HashMap<String, Double>() {{
+            put("1", 0.1D);
+        }});
+        // 取下标[2,4]元素
+        jedis.zrange("zset", 2, 4);
+        // 取下标[2,4]元素和score
+        jedis.zrangeWithScores("zset", 2, 4);
+        // 取score[0.2,0.4]元素
+        jedis.zrangeByScore("zset", 0.2, 0.4);
+        // 取score[0.2,0.4]元素和score
+        jedis.zrangeByScoreWithScores("zset", 0.2, 0.4);
+        // 取值为val的score
+        jedis.zscore("zset", "val");
+        // 取值为val的排名
+        jedis.zrank("zset", "val");
+        // 删值为val的元素
+        jedis.zrem("zset", "val");
+        // 取元素个数
+        jedis.zcard("zset");
+        // 取score[0.2,0.4]元素个数
+        jedis.zcount("zset", 0.2, 0.4);
+        // 值为val的score+1
+        jedis.zincrby("zset", 1, "val");
+    }
+
+    /**
+     * sort操作
+     *
+     * @param jedis jedis
+     */
+    private void sort(Jedis jedis) {
+        // 生成排序对象
+//        new SortParameters();
+        // a-z排序
+        jedis.sort("key", new SortingParams().alpha());
+        // 升序
+        jedis.sort("key", new SortingParams().asc());
+        //降序
+        jedis.sort("key", new SortingParams().desc());
+    }
+
+    private static final String LOCK_SUCCESS = "OK";
+    private static final Long RELEASE_SUCCESS = 1L;
+
+    /**
+     * 分布式锁:LUA脚本
+     *
+     * @param jedis      Redis客户端
+     * @param lockKey    锁
+     * @param requestId  请求标识
+     * @param expireTime 超期时间
+     */
+    private void distributedLock(Jedis jedis, String lockKey, String requestId, String expireTime) {
+        tryGetDistributedLock(jedis, lockKey, requestId, expireTime);
+        releaseDistributedLock(jedis, lockKey, requestId);
+    }
+
+    /**
+     * 尝试获取分布式锁
+     *
+     * @param jedis      Redis客户端
+     * @param lockKey    锁
+     * @param requestId  请求标识
+     * @param expireTime 超期时间
+     * @return 是否获取成功
+     */
+    private static boolean tryGetDistributedLock(Jedis jedis, String lockKey, String requestId, String expireTime) {
+        String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+        Object result = jedis.eval(script, 3, lockKey, requestId, expireTime);
+        return LOCK_SUCCESS.equals(result);
+    }
+
+    /**
+     * 释放分布式锁
+     *
+     * @param jedis     Redis客户端
+     * @param lockKey   锁
+     * @param requestId 请求标识
+     * @return 是否释放成功
+     */
+    private static boolean releaseDistributedLock(Jedis jedis, String lockKey, String requestId) {
+        String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+        Object result = jedis.eval(script, 2, lockKey, requestId);
+        return RELEASE_SUCCESS.equals(result);
     }
 }

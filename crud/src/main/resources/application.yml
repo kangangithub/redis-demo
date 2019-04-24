@@ -43,17 +43,17 @@ spring:
         max-wait: -1ms
         max-active: 8
       shutdown-timeout: 100ms
-    # jedis客户端
-    jedis:
-      pool:
-      # 最大连接数（负值表示没有限制）
-        max-active: 8
-      # 最大阻塞等待时间（负值表示没有限制）
-        max-wait: 1ms
-      # 最大空闲链接
-        max-idle: 8
-      # 最小空闲链接
-        min-idle: 0
+#    # jedis客户端
+#    jedis:
+#      pool:
+#      # 最大连接数（负值表示没有限制）
+#        max-active: 8
+#      # 最大阻塞等待时间（负值表示没有限制）
+#        max-wait: 1ms
+#      # 最大空闲链接
+#        max-idle: 8
+#      # 最小空闲链接
+#        min-idle: 0
 
 # 日志
 logging:

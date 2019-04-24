@@ -1,16 +1,14 @@
 package com.redis.crud.api;
 
 import org.springframework.data.redis.core.*;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -78,12 +76,13 @@ public class RedisTemplateCRUD {
      */
     @ResponseBody
     @PostMapping("/redisTemplateTest")
-    public void redisTemplateTest() {
+    public void redisTemplateTest(RedisTemplate redisTemplate) {
         opsForValue();
         opsForList();
         opsForHash();
         opsForSet();
         opsForZSet();
+        distributedLock(redisTemplate,"lockKey", "requestId", "60");
     }
 
     /**
@@ -152,7 +151,7 @@ public class RedisTemplateCRUD {
 
         //使用Cursor在key的ZSet中迭代，相当于迭代器
         Cursor<ZSetOperations.TypedTuple<Object>> cursor = redisTemplate.opsForZSet().scan("zzset1", ScanOptions.NONE);
-        while (cursor.hasNext()){
+        while (cursor.hasNext()) {
             ZSetOperations.TypedTuple<Object> item = cursor.next();
             System.out.println(item.getValue() + ":" + item.getScore());
         } // zset1: {value1:0.1, value2:0.2, value5:9.5, value6:9.6}
@@ -437,6 +436,8 @@ public class RedisTemplateCRUD {
         redisTemplate.opsForValue().set("key", "redis", 6); //结果：hello redis
 
         redisTemplate.opsForValue().setIfAbsent("multi1", "multi1");//false说明multi1已存在 true说明不存在
+        // 分布式锁
+        redisTemplate.opsForValue().setIfAbsent("multi1", "multi1", 60, TimeUnit.SECONDS);//false说明multi1已存在 true说明不存在
 
         //存取多个
         redisTemplate.opsForValue().multiSet(new HashMap<String, String>() {
@@ -480,6 +481,81 @@ public class RedisTemplateCRUD {
         redisTemplate.opsForValue().setBit("bitTest", 6, true);
         redisTemplate.opsForValue().setBit("bitTest", 7, false);
         redisTemplate.opsForValue().get("bitTest"); // b
+    }
+
+    /**
+     * 定义获取锁的lua脚本
+     * <p>
+     * -- 加锁脚本，其中KEYS[]为外部传入参数
+     * -- KEYS[1]表示key
+     * -- KEYS[2]表示value
+     * -- KEYS[3]表示过期时间
+     * -- return 1 设置超时成功-->获取锁成功
+     * -- return 0 设置key失败或设置超时失败-->获取锁失败
+     * if redis.call("setnx", KEYS[1], KEYS[2]) == 1 then
+     * return redis.call("pexpire", KEYS[1], KEYS[3])
+     * else
+     * return 0
+     */
+    private final static DefaultRedisScript<Long> LOCK_LUA_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call(\"setnx\", KEYS[1], KEYS[2]) == 1 then return redis.call(\"pexpire\", KEYS[1], KEYS[3]) else return 0 end"
+            , Long.class
+    );
+
+    /**
+     * 定义释放锁的lua脚本
+     * <p>
+     * -- 解锁脚本
+     * -- KEYS[1]表示key
+     * -- KEYS[2]表示value
+     * -- return = 1 删除锁成功-->释放锁成功,return 0 删除锁失败(可能超时)-->释放锁成功
+     * -- return -1 表示未能获取到key或者key的值与传入的值不相等-->释放锁成功
+     * if redis.call("get",KEYS[1]) == KEYS[2] then
+     * return redis.call("del",KEYS[1])
+     * else
+     * return -1
+     */
+    private final static DefaultRedisScript<Long> UNLOCK_LUA_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call(\"get\",KEYS[1]) == KEYS[2] then return redis.call(\"del\",KEYS[1]) else return -1 end"
+            , Long.class
+    );
+
+    private static final String LOCK_SUCCESS = "OK";
+    private static final Long RELEASE_SUCCESS = 1L;
+
+    /**
+     * 分布式锁:LUA脚本
+     */
+    private void distributedLock(RedisTemplate redisTemplate, String lockKey, String requestId, String expireTime) {
+        tryGetDistributedLock(redisTemplate, lockKey, requestId, expireTime);
+        releaseDistributedLock(redisTemplate, lockKey, requestId);
+    }
+
+    /**
+     * 尝试获取分布式锁
+     *
+     * @param redisTemplate redis客户端
+     * @param lockKey    锁
+     * @param requestId  请求标识
+     * @param expireTime 超期时间
+     * @return 是否获取成功
+     */
+    private boolean tryGetDistributedLock(RedisTemplate redisTemplate, String lockKey, String requestId, String expireTime) {
+        Object result = redisTemplate.execute(LOCK_LUA_SCRIPT, Arrays.asList(lockKey, requestId, expireTime));
+        return LOCK_SUCCESS.equals(result);
+    }
+
+    /**
+     * 释放分布式锁
+     *
+     * @param redisTemplate redis客户端
+     * @param lockKey       锁
+     * @param requestId     请求标识
+     * @return 是否释放成功
+     */
+    private boolean releaseDistributedLock(RedisTemplate redisTemplate, String lockKey, String requestId) {
+        Object result = redisTemplate.execute(UNLOCK_LUA_SCRIPT, Arrays.asList(lockKey, requestId));
+        return RELEASE_SUCCESS.equals(result);
     }
 
 }
