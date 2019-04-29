@@ -6,7 +6,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 抢红包
@@ -24,7 +26,9 @@ public class GrabRedPacket {
     @PostMapping("/initRedPacket")
     public void initRedPacket() {
         // 红包并存入Redis
-        redisTemplate.opsForList().leftPushAll("redPacket", "1", "3", "2.5", "5", "1.2", "3.3", "4.5", "7.8", "1.9", "2.7");
+        List<Integer> integerList = RedPacketUtils.getPackage(10, 100);
+        List<String> redPacket = integerList.stream().map(integer -> integer + "").collect(Collectors.toList());
+        redisTemplate.opsForList().leftPushAll("redPacket", redPacket);
         System.out.println(redisTemplate.opsForList().range("redPacket", 0, -1));
     }
 
