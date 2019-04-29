@@ -17,7 +17,7 @@ import java.util.HashMap;
 @RestController
 @RequestMapping(value = "/crud/jedis")
 public class JedisCRUD {
-    @Resource
+//    @Resource
     private JedisPool jedisPool;
 
     @ResponseBody

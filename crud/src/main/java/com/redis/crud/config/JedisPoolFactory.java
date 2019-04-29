@@ -8,14 +8,14 @@ import redis.clients.jedis.JedisPoolConfig;
 
 import javax.annotation.Resource;
 
-@Configuration
+//@Configuration
 public class JedisPoolFactory {
 
     //自动注入redis配置属性文件
-    @Resource
+//    @Resource
     private RedisProperties properties;
 
-    @Bean
+//    @Bean
     public JedisPool getJedisPool() {
         JedisPoolConfig config = new JedisPoolConfig();
         config.setMaxIdle(properties.getJedis().getPool().getMaxIdle());
