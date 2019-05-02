@@ -10,7 +10,7 @@ spring:
   datasource:
     # 新路径 com.mysql.cj.jdbc.Driver
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://116.62.198.241:3306/insure_eval?serverTimezone=UTC&useSSL=false&useUnicode=true&characterEncoding=utf-8
+    url: jdbc:mysql://116.62.198.241:3306/test?serverTimezone=UTC&useSSL=false&useUnicode=true&characterEncoding=utf-8
     username: root
     password: Ak902078.
     #    type: com.alibaba.druid.pool.DruidDataSource
