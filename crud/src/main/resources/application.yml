@@ -10,9 +10,9 @@ spring:
   datasource:
     # 新路径 com.mysql.cj.jdbc.Driver
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://116.62.198.241:3306/test?serverTimezone=UTC&useSSL=false&useUnicode=true&characterEncoding=utf-8
-    username: root
-    password: Ak902078.
+    url: jdbc:mysql://xxx.xxx.xxx.xxx:xxx/xxx?serverTimezone=UTC&useSSL=false&useUnicode=true&characterEncoding=utf-8
+    username: xxx
+    password: xxx
     #    type: com.alibaba.druid.pool.DruidDataSource
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
@@ -28,8 +28,8 @@ spring:
   # redis配置
   redis:
     database: 0
-    host: 116.62.198.241
-    port: 6379
+    host: xxx.xxx.xxx.xxx
+    port: xxx
     password:
     # Lettuce 和 Jedis 的都是连接Redis Server的客户端程序。
     # Jedis在实现上是直连redis server，多线程环境下非线程安全，除非使用连接池，为每个Jedis实例增加物理连接。
